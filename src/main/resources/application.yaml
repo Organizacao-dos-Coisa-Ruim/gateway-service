@@ -53,3 +53,8 @@ management:
     health:
       probes:
         enabled: true
+  metrics:
+    distribution:
+      # histograma de latência por rota, para calcular p95/p99 no Grafana
+      percentiles-histogram:
+        http.server.requests: true
