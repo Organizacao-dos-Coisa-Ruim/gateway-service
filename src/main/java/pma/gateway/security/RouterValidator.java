@@ -25,6 +25,18 @@ public class RouterValidator {
       new OpenRoute(null, "/**/health-check"),
       new OpenRoute(null, "/gateway/actuator/**"));
 
+  /**
+   * Rotas protegidas que só o papel "admin" pode chamar (RBAC). Os outros recebem 403.
+   * POST /accounts e /accounts/login são de uso interno do Auth: pelo gateway, só admin.
+   */
+  private static final List<OpenRoute> ADMIN_ROUTES = List.of(
+      new OpenRoute(HttpMethod.GET, "/accounts"),
+      new OpenRoute(HttpMethod.POST, "/accounts"),
+      new OpenRoute(HttpMethod.POST, "/accounts/login"),
+      new OpenRoute(HttpMethod.DELETE, "/accounts/**"));
+
+  public static final String ROLE_ADMIN = "admin";
+
   private final AntPathMatcher matcher = new AntPathMatcher();
 
   public boolean isSecured(ServerHttpRequest request) {
@@ -32,8 +44,16 @@ public class RouterValidator {
     if (HttpMethod.OPTIONS.equals(request.getMethod())) {
       return false;
     }
+    return !matchesAny(OPEN_ROUTES, request);
+  }
+
+  public boolean isAdminOnly(ServerHttpRequest request) {
+    return matchesAny(ADMIN_ROUTES, request);
+  }
+
+  private boolean matchesAny(List<OpenRoute> routes, ServerHttpRequest request) {
     String path = request.getPath().value();
-    return OPEN_ROUTES.stream().noneMatch(route ->
+    return routes.stream().anyMatch(route ->
         (route.method() == null || route.method().equals(request.getMethod()))
             && matcher.match(route.pattern(), path));
   }

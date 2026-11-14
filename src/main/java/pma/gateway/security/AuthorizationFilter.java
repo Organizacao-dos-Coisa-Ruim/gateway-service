@@ -18,7 +18,8 @@ import reactor.core.publisher.Mono;
  * 1. Remove headers de identidade vindos do cliente (evita que alguém se passe por outro usuário).
  * 2. Rotas abertas seguem direto.
  * 3. Rotas protegidas exigem "Authorization: Bearer <token>", validado no Auth.
- * 4. Com token válido, repassa id-account e role-account para o serviço de destino.
+ * 4. Rotas só de admin (RouterValidator.isAdminOnly) devolvem 403 para outros papéis.
+ * 5. Com acesso liberado, repassa id-account e role-account para o serviço de destino.
  */
 @Component
 public class AuthorizationFilter implements GlobalFilter, Ordered {
@@ -56,9 +57,13 @@ public class AuthorizationFilter implements GlobalFilter, Ordered {
 
     // Primeiro decide (liberar ou negar), depois executa. Assim erros do serviço de destino
     // não são confundidos com erros de autenticação.
+    boolean adminOnly = routerValidator.isAdminOnly(request);
     return authService.solve(jwt)
         .filter(solved -> solved.idAccount() != null)
-        .map(solved -> Decision.allow(request.mutate()
+        .map(solved -> adminOnly && !RouterValidator.ROLE_ADMIN.equalsIgnoreCase(solved.role())
+            // token válido, mas o papel não pode acessar esta rota (RBAC)
+            ? Decision.deny(HttpStatus.FORBIDDEN)
+            : Decision.allow(request.mutate()
             .header(HEADER_ID_ACCOUNT, solved.idAccount())
             .header(HEADER_ROLE_ACCOUNT, solved.role() == null ? "" : solved.role())
             .build()))

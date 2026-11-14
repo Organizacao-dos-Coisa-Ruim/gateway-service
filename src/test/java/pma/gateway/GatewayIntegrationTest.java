@@ -30,6 +30,7 @@ import com.sun.net.httpserver.HttpServer;
 class GatewayIntegrationTest {
 
   private static final String VALID_TOKEN = "token-valido";
+  private static final String ADMIN_TOKEN = "token-admin";
 
   private static final HttpServer backend = startBackend();
 
@@ -95,7 +96,7 @@ class GatewayIntegrationTest {
 
   @Test
   void securedRouteWithValidTokenForwardsIdentity() {
-    client.get().uri("/accounts")
+    client.get().uri("/accounts/123")
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN)
         .exchange().expectStatus().isOk();
     assertThat(receivedIdAccount.get()).isEqualTo("123");
@@ -104,7 +105,7 @@ class GatewayIntegrationTest {
 
   @Test
   void spoofedIdentityHeaderIsRemoved() {
-    client.get().uri("/accounts")
+    client.get().uri("/accounts/123")
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN)
         .header("id-account", "hacker")
         .exchange().expectStatus().isOk();
@@ -117,6 +118,33 @@ class GatewayIntegrationTest {
         .header("id-account", "hacker")
         .exchange().expectStatus().isOk();
     assertThat(receivedIdAccount.get()).isNull();
+  }
+
+  // --- RBAC --------------------------------------------------------------------
+
+  @Test
+  void adminRouteWithUserTokenReturns403AndDoesNotReachService() {
+    client.get().uri("/accounts")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN)
+        .exchange().expectStatus().isForbidden();
+    client.delete().uri("/accounts/123")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN)
+        .exchange().expectStatus().isForbidden();
+    assertThat(receivedIdAccount.get()).isNull();
+  }
+
+  @Test
+  void adminRouteWithAdminTokenIsForwarded() {
+    client.get().uri("/accounts")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ADMIN_TOKEN)
+        .exchange().expectStatus().isOk();
+    assertThat(receivedIdAccount.get()).isEqualTo("999");
+    assertThat(receivedRole.get()).isEqualTo("admin");
+  }
+
+  @Test
+  void adminRouteWithoutTokenStillReturns401() {
+    client.get().uri("/accounts").exchange().expectStatus().isUnauthorized();
   }
 
   @Test
@@ -153,7 +181,9 @@ class GatewayIntegrationTest {
 
   private static void solve(HttpExchange ex) throws IOException {
     String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-    if (body.contains(VALID_TOKEN)) {
+    if (body.contains(ADMIN_TOKEN)) {
+      respond(ex, 200, "{\"idAccount\":\"999\",\"role\":\"admin\"}");
+    } else if (body.contains(VALID_TOKEN)) {
       respond(ex, 200, "{\"idAccount\":\"123\",\"role\":\"USER\"}");
     } else {
       respond(ex, 401, "");

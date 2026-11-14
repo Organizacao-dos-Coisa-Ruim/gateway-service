@@ -35,10 +35,10 @@ O `AuthorizationFilter` roda antes de todas as rotas:
    200 -> {"idAccount": "...", "role": "..."}
    4xx -> token inválido/expirado
    ```
-4. Token válido: repassa `id-account` e `role-account` para o serviço de destino.
+4. **RBAC**: rotas só de admin (`GET /accounts`, `POST /accounts`, `POST /accounts/login`, `DELETE /accounts/**`) devolvem **403** se o `role` do token não for `admin`.
+5. Acesso liberado: repassa `id-account` e `role-account` para o serviço de destino.
    Token ausente ou inválido: **401**. Auth fora do ar: **503**.
 
-> ⚠️ O serviço **Auth precisa implementar `POST /auth/solve`** com esse contrato.
 
 ## Variáveis de ambiente
 
@@ -59,8 +59,8 @@ docker run -p 8080:8080 gateway
 
 ## Testes
 
-- `RouterValidatorTest`: quais rotas são abertas e quais são protegidas.
-- `GatewayIntegrationTest`: sobe o gateway com um servidor HTTP falso no lugar do Auth/Account e testa health-check, info, métricas, 401 sem token ou com token inválido, repasse da identidade com token válido, remoção de headers forjados e preflight de CORS.
+- `RouterValidatorTest`: quais rotas são abertas e quais são protegidas (e quais são só de admin).
+- `GatewayIntegrationTest`: sobe o gateway com um servidor HTTP falso no lugar do Auth/Account e testa health-check, info, métricas, 401 sem token ou com token inválido,  em rota de admin com token de user, remoção de headers forjados e preflight de CORS.
 
 ## Uso de IA
 

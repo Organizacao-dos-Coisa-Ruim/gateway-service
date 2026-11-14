@@ -33,4 +33,23 @@ class RouterValidatorTest {
     assertThat(secured(HttpMethod.GET, "/products/1")).isTrue();
   }
 
+  private boolean adminOnly(HttpMethod method, String path) {
+    return validator.isAdminOnly(MockServerHttpRequest.method(method, path).build());
+  }
+
+  @Test
+  void adminOnlyRoutes() {
+    assertThat(adminOnly(HttpMethod.GET, "/accounts")).isTrue();
+    assertThat(adminOnly(HttpMethod.POST, "/accounts")).isTrue();
+    assertThat(adminOnly(HttpMethod.POST, "/accounts/login")).isTrue();
+    assertThat(adminOnly(HttpMethod.DELETE, "/accounts/123")).isTrue();
+  }
+
+  @Test
+  void routesForAnyAuthenticatedUser() {
+    assertThat(adminOnly(HttpMethod.GET, "/accounts/123")).isFalse();
+    assertThat(adminOnly(HttpMethod.GET, "/products")).isFalse();
+    assertThat(adminOnly(HttpMethod.POST, "/orders")).isFalse();
+  }
+
 }
