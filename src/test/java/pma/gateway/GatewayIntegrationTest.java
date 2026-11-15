@@ -68,6 +68,20 @@ class GatewayIntegrationTest {
   }
 
   @Test
+  void securityHeadersOnEveryResponse() {
+    // endpoint do próprio gateway, 401 gerado pelo AuthorizationFilter e rota proxiada para o "Account"
+    for (WebTestClient.ResponseSpec response : new WebTestClient.ResponseSpec[] {
+        client.get().uri("/health-check").exchange(),
+        client.get().uri("/accounts").exchange(),
+        client.get().uri("/accounts/123").header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN).exchange()}) {
+      response.expectHeader().valueEquals("X-Content-Type-Options", "nosniff")
+          .expectHeader().valueEquals("Cross-Origin-Resource-Policy", "same-origin")
+          .expectHeader().valueEquals("X-Frame-Options", "DENY")
+          .expectHeader().valueEquals("Referrer-Policy", "no-referrer");
+    }
+  }
+
+  @Test
   void infoReturnsNameAndHostname() {
     client.get().uri("/info").exchange()
         .expectStatus().isOk()
