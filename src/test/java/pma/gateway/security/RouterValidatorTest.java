@@ -43,12 +43,15 @@ class RouterValidatorTest {
     assertThat(adminOnly(HttpMethod.POST, "/accounts")).isTrue();
     assertThat(adminOnly(HttpMethod.POST, "/accounts/login")).isTrue();
     assertThat(adminOnly(HttpMethod.DELETE, "/accounts/123")).isTrue();
+    assertThat(adminOnly(HttpMethod.POST, "/products")).isTrue();
+    assertThat(adminOnly(HttpMethod.DELETE, "/products/123")).isTrue();
   }
 
   @Test
   void routesForAnyAuthenticatedUser() {
     assertThat(adminOnly(HttpMethod.GET, "/accounts/123")).isFalse();
     assertThat(adminOnly(HttpMethod.GET, "/products")).isFalse();
+    assertThat(adminOnly(HttpMethod.GET, "/products/123")).isFalse();
     assertThat(adminOnly(HttpMethod.POST, "/orders")).isFalse();
   }
 
