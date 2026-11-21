@@ -3,6 +3,8 @@
 # Todo push/PR: roda os testes (o gateway não depende de nenhuma interface).
 # Push na main: também publica a imagem no Docker Hub (<usuario>/gateway:latest e :<sha>),
 # se os secrets DOCKERHUB_USERNAME e DOCKERHUB_TOKEN estiverem configurados na organização.
+# Depois do push: deploy no EKS (kubectl set image com a tag do commit), se os secrets AWS_ACCESS_KEY_ID e
+# AWS_SECRET_ACCESS_KEY existirem e o cluster estiver de pé (o cluster só existe durante os testes: sem ele, pula).
 name: CI
 
 on:
@@ -48,3 +50,41 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    name: Deploy no EKS
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HAS_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.DOCKERHUB_TOKEN != '' }}
+      CLUSTER: pma26
+      AWS_REGION: us-east-1
+    steps:
+      - name: Credenciais AWS
+        if: env.HAS_AWS == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # o EKS é destruído ao fim de cada sessão de testes (custo): sem cluster, o deploy é pulado sem erro
+      - name: Cluster existe?
+        id: cluster
+        if: env.HAS_AWS == 'true'
+        run: |
+          if aws eks describe-cluster --name "$CLUSTER" >/dev/null 2>&1; then
+            echo "up=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Cluster $CLUSTER não existe agora; deploy pulado."
+          fi
+
+      # troca só a imagem do deployment pela tag deste commit; o Kubernetes faz rolling update
+      # (sobe o pod novo, espera a readinessProbe, só então derruba o antigo)
+      - name: Deploy
+        if: steps.cluster.outputs.up == 'true'
+        run: |
+          aws eks update-kubeconfig --name "$CLUSTER"
+          kubectl -n pma26 set image deployment/${{ env.IMAGE }} ${{ env.IMAGE }}=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE }}:${{ github.sha }}
+          kubectl -n pma26 rollout status deployment/${{ env.IMAGE }} --timeout=5m
