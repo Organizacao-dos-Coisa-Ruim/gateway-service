@@ -28,12 +28,15 @@ public class RouterValidator {
   /**
    * Rotas protegidas que só o papel "admin" pode chamar (RBAC). Os outros recebem 403.
    * POST /accounts e /accounts/login são de uso interno do Auth: pelo gateway, só admin.
+   * Catálogo: qualquer usuário logado consulta produtos, mas só admin cria e apaga.
    */
   private static final List<OpenRoute> ADMIN_ROUTES = List.of(
       new OpenRoute(HttpMethod.GET, "/accounts"),
       new OpenRoute(HttpMethod.POST, "/accounts"),
       new OpenRoute(HttpMethod.POST, "/accounts/login"),
-      new OpenRoute(HttpMethod.DELETE, "/accounts/**"));
+      new OpenRoute(HttpMethod.DELETE, "/accounts/**"),
+      new OpenRoute(HttpMethod.POST, "/products"),
+      new OpenRoute(HttpMethod.DELETE, "/products/**"));
 
   public static final String ROLE_ADMIN = "admin";
 
